@@ -10,22 +10,23 @@ const emit = defineEmits(['update-param', 'update-kernel']);
 const selectedKernel = ref('rbf');
 
 const kernels = [
-  { 
-    key: 'rbf', 
+  {
+    key: 'rbf',
     name: 'RBF (Squared Exponential)',
-    equation: 'k(x, x\') = σ² exp(-||x-x\'||² / 2ℓ²)'
+    equation: "k(x, x') = \\sigma^2 \\exp\\left(-\\frac{\\|x-x'\\|^2}{2\\ell^2}\\right)"
   },
-  { 
-    key: 'matern12', 
+  {
+    key: 'matern12',
     name: 'Matérn 1/2',
-    equation: 'k(x, x\') = σ² exp(-|x-x\'| / ℓ)'
+    equation: "k(x, x') = \\sigma^2 \\exp\\left(-\\frac{|x-x'|}{\\ell}\\right)"
   },
-  { 
-    key: 'matern32', 
+  {
+    key: 'matern32',
     name: 'Matérn 3/2',
-    equation: 'k(x, x\') = σ² (1 + √3r) exp(-√3r)'
+    equation: "k(x, x') = \\sigma^2 (1 + \\sqrt{3}r) \\exp(-\\sqrt{3}r)"
   },
 ];
+
 
 function updateParam(index, newValue) {
   emit('update-param', index, newValue);
@@ -76,7 +77,7 @@ function selectKernel(key) {
             />
             <div class="kernel-option-content">
               <div class="kernel-name">{{ kernel.name }}</div>
-              <div class="kernel-equation">{{ kernel.equation }}</div>
+              <div class="kernel-equation" v-katex="kernel.equation"></div>
             </div>
           </label>
         </div>
@@ -120,10 +121,12 @@ input[type="range"] {
   background: #1e1e2e;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   width: 18px;
   height: 18px;
   border-radius: 50%;
