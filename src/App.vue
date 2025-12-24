@@ -75,23 +75,28 @@ function updateKernel(kernel) {
     </header>
 
     <div class="main-grid">
-      <GPCanvas
-        :points="points"
-        :samples="samples"
-        :params="gpParams"
-        @add-point="addPoint"
-      />
-
-      <div class="sidebar">
-        <KernelParameters 
-          :params="params" 
-          @update-param="updateParamValue" 
-          @update-kernel="updateKernel"
+      <div class="canvas-area">
+        <GPCanvas
+          :points="points"
+          :samples="samples"
+          :params="gpParams"
+          @add-point="addPoint"
         />
         <ActionsPanel
           @add-random="addRandomPoints"
           @sample-gp="sampleGP"
           @clear-all="clearAll"
+        />
+        <div class="info-message">
+          Click on the canvas to add observations. The GP posterior updates in real-time.
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <KernelParameters
+          :params="params"
+          @update-param="updateParamValue"
+          @update-kernel="updateKernel"
         />
       </div>
     </div>
@@ -99,4 +104,19 @@ function updateKernel(kernel) {
 </template>
 
 <style scoped>
+.canvas-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-message {
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+  padding: 12px;
+  background: rgba(0, 212, 255, 0.05);
+  border: 1px solid rgba(0, 212, 255, 0.1);
+  border-radius: 12px;
+}
 </style>

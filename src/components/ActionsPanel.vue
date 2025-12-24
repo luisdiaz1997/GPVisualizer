@@ -3,41 +3,27 @@ const emit = defineEmits(['add-random', 'sample-gp', 'clear-all']);
 </script>
 
 <template>
-  <div class="panel">
-    <div class="panel-header">
-      <div class="panel-title">Actions</div>
-    </div>
-    <div class="panel-content">
-      <div class="button-group">
-        <button class="btn-primary" @click="emit('add-random')">
-          <span>✦</span> Add Random Points
-        </button>
-        <button class="btn-secondary" @click="emit('sample-gp')">
-          <span>〰</span> Sample GP
-        </button>
-        <button class="btn-danger" @click="emit('clear-all')">
-          <span>✕</span> Clear All
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div class="info-panel">
-    <p><strong>Click</strong> on the canvas to add observations. The GP posterior updates in real-time.</p>
+  <div class="actions-container">
+    <button class="btn-primary" @click="emit('add-random')">
+      <span>✦</span> Add Random Points
+    </button>
+    <button class="btn-secondary" @click="emit('sample-gp')">
+      <span>〰</span> Sample GP
+    </button>
+    <button class="btn-danger" @click="emit('clear-all')">
+      <span>✕</span> Clear All
+    </button>
   </div>
 </template>
 
 <style scoped>
-/* Panel styles moved to assets/css/components.css */
-
-.button-group {
+.actions-container {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 button {
-  width: 100%;
+  flex: 1;
   padding: 12px 16px;
   border: none;
   border-radius: 10px;
@@ -81,22 +67,5 @@ button {
 
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.2);
-}
-
-.info-panel {
-  background: rgba(0, 212, 255, 0.05);
-  border: 1px solid rgba(0, 212, 255, 0.1);
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.info-panel p {
-  font-size: 13px;
-  color: #666;
-  line-height: 1.6;
-}
-
-.info-panel strong {
-  color: #888;
 }
 </style>
