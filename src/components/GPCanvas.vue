@@ -17,20 +17,43 @@ let width = 0;
 let height = 0;
 
 // Coordinate bounds
-const bounds = { xMin: -3, xMax: 3, yMin: -2, yMax: 2 };
+const defaultBounds = { xMin: -3, xMax: 3, yMin: -2, yMax: 2 };
+const bounds = ref({ ...defaultBounds });
 const numTest = 300;
-const testX = linspace(bounds.xMin, bounds.xMax, numTest);
+const testX = computed(() => linspace(bounds.value.xMin, bounds.value.xMax, numTest));
+
+// Zoom and pan state
+const zoomLevel = ref(1.0);
+const panOffset = ref({ x: 0, y: 0 });
+const isDragging = ref(false);
+const hasDragged = ref(false);
+const lastMousePos = ref({ x: 0, y: 0 });
+const initialTouchDistance = ref(0);
+
+// Zoom limits
+const MAX_SCALE_FACTOR = 4; // World is 4x the default view
+const MIN_ZOOM = 1 / MAX_SCALE_FACTOR;
+const MAX_ZOOM = 3.0;
 
 // Coordinate transforms
-const toCanvasX = (x) => ((x - bounds.xMin) / (bounds.xMax - bounds.xMin)) * width;
-const toCanvasY = (y) => height - ((y - bounds.yMin) / (bounds.yMax - bounds.yMin)) * height;
-const toDataX = (cx) => bounds.xMin + (cx / width) * (bounds.xMax - bounds.xMin);
-const toDataY = (cy) => bounds.yMax - (cy / height) * (bounds.yMax - bounds.yMin);
+const toCanvasX = (x) => ((x - bounds.value.xMin) / (bounds.value.xMax - bounds.value.xMin)) * width;
+const toCanvasY = (y) => height - ((y - bounds.value.yMin) / (bounds.value.yMax - bounds.value.yMin)) * height;
+const toDataX = (cx) => bounds.value.xMin + (cx / width) * (bounds.value.xMax - bounds.value.xMin);
+const toDataY = (cy) => bounds.value.yMax - (cy / height) * (bounds.value.yMax - bounds.value.yMin);
+
+// Helper for dynamic grid spacing
+function calculateGridStep(range) {
+  if (range < 0.25) return 0.05;
+  if (range < 0.5) return 0.1;
+  if (range < 1) return 0.25;
+  if (range < 2) return 0.5;
+  return 1;
+}
 
 // Drawing functions
 function drawGrid() {
   if (!ctx) return;
-  
+
   ctx.strokeStyle = '#1e1e2e';
   ctx.lineWidth = 1;
   ctx.textAlign = 'center';
@@ -41,7 +64,18 @@ function drawGrid() {
   const zeroX = toCanvasX(0);
   const zeroY = toCanvasY(0);
 
-  for (let x = Math.ceil(bounds.xMin); x <= bounds.xMax; x++) {
+  // Calculate appropriate grid spacing based on zoom level
+  const xRange = bounds.value.xMax - bounds.value.xMin;
+  const yRange = bounds.value.yMax - bounds.value.yMin;
+
+  const xStep = calculateGridStep(xRange);
+  const yStep = calculateGridStep(yRange);
+
+  // Draw vertical lines and labels
+  const startX = Math.ceil(bounds.value.xMin / xStep) * xStep;
+  const endX = Math.floor(bounds.value.xMax / xStep) * xStep;
+
+  for (let x = startX; x <= endX; x += xStep) {
     const cx = toCanvasX(x);
     ctx.beginPath();
     ctx.moveTo(cx, 0);
@@ -49,11 +83,19 @@ function drawGrid() {
     ctx.stroke();
 
     // X-axis labels
-    if (x !== 0) {
-      ctx.fillText(x.toString(), cx, zeroY + 15);
+    if (Math.abs(x) > 0.001) { // Avoid showing 0 label
+      const label = xStep === 1 ? x.toString() : x.toFixed(2);
+      // Clamp label Y position to keep it visible
+      const labelY = Math.max(20, Math.min(height - 20, zeroY + 15));
+      ctx.fillText(label, cx, labelY);
     }
   }
-  for (let y = Math.ceil(bounds.yMin); y <= bounds.yMax; y++) {
+
+  // Draw horizontal lines and labels
+  const startY = Math.ceil(bounds.value.yMin / yStep) * yStep;
+  const endY = Math.floor(bounds.value.yMax / yStep) * yStep;
+
+  for (let y = startY; y <= endY; y += yStep) {
     const cy = toCanvasY(y);
     ctx.beginPath();
     ctx.moveTo(0, cy);
@@ -61,8 +103,12 @@ function drawGrid() {
     ctx.stroke();
 
     // Y-axis labels
-    if (y !== 0) {
-      ctx.fillText(y.toString(), zeroX - 15, cy);
+    if (Math.abs(y) > 0.001) { // Avoid showing 0 label
+      const label = yStep === 1 ? y.toString() : y.toFixed(2);
+      // Clamp label X position to keep it visible
+      const labelX = Math.max(25, Math.min(width - 25, zeroX - 15));
+      ctx.textAlign = 'right';
+      ctx.fillText(label, labelX, cy);
     }
   }
 
@@ -83,13 +129,13 @@ function drawConfidenceBand(mean, variance) {
   if (!ctx) return;
   
   ctx.beginPath();
-  for (let i = 0; i < testX.length; i++) {
-    const x = toCanvasX(testX[i]);
+  for (let i = 0; i < testX.value.length; i++) {
+    const x = toCanvasX(testX.value[i]);
     const y = toCanvasY(mean[i] + 2 * Math.sqrt(variance[i]));
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
-  for (let i = testX.length - 1; i >= 0; i--) {
-    const x = toCanvasX(testX[i]);
+  for (let i = testX.value.length - 1; i >= 0; i--) {
+    const x = toCanvasX(testX.value[i]);
     const y = toCanvasY(mean[i] - 2 * Math.sqrt(variance[i]));
     ctx.lineTo(x, y);
   }
@@ -112,8 +158,8 @@ function drawMeanLine(mean) {
   ctx.lineWidth = 8;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  for (let i = 0; i < testX.length; i++) {
-    const x = toCanvasX(testX[i]);
+  for (let i = 0; i < testX.value.length; i++) {
+    const x = toCanvasX(testX.value[i]);
     const y = toCanvasY(mean[i]);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
@@ -123,8 +169,8 @@ function drawMeanLine(mean) {
   ctx.beginPath();
   ctx.strokeStyle = '#00d4ff';
   ctx.lineWidth = 3;
-  for (let i = 0; i < testX.length; i++) {
-    const x = toCanvasX(testX[i]);
+  for (let i = 0; i < testX.value.length; i++) {
+    const x = toCanvasX(testX.value[i]);
     const y = toCanvasY(mean[i]);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
@@ -191,7 +237,7 @@ function render() {
   drawGrid();
   drawSamples();
 
-  const { mean, variance } = computePosterior(props.points, testX, props.params);
+  const { mean, variance } = computePosterior(props.points, testX.value, props.params);
   drawConfidenceBand(mean, variance);
   drawMeanLine(mean);
   drawPoints();
@@ -213,20 +259,198 @@ function setupCanvas() {
   render();
 }
 
+// Zoom and pan functions
+function clampPanOffset(offset) {
+  const worldWidth = (defaultBounds.xMax - defaultBounds.xMin) * MAX_SCALE_FACTOR;
+  const worldHeight = (defaultBounds.yMax - defaultBounds.yMin) * MAX_SCALE_FACTOR;
+  
+  const viewWidth = (defaultBounds.xMax - defaultBounds.xMin) / zoomLevel.value;
+  const viewHeight = (defaultBounds.yMax - defaultBounds.yMin) / zoomLevel.value;
+
+  // Max pan is half the difference between world size and view size
+  const maxPanX = Math.max(0, (worldWidth - viewWidth) / 2);
+  const maxPanY = Math.max(0, (worldHeight - viewHeight) / 2);
+  
+  return {
+    x: Math.max(-maxPanX, Math.min(maxPanX, offset.x)),
+    y: Math.max(-maxPanY, Math.min(maxPanY, offset.y))
+  };
+}
+
+function updateBounds() {
+  const centerX = (defaultBounds.xMin + defaultBounds.xMax) / 2 + panOffset.value.x;
+  const centerY = (defaultBounds.yMin + defaultBounds.yMax) / 2 + panOffset.value.y;
+
+  const rangeX = (defaultBounds.xMax - defaultBounds.xMin) / (2 * zoomLevel.value);
+  const rangeY = (defaultBounds.yMax - defaultBounds.yMin) / (2 * zoomLevel.value);
+
+  bounds.value = {
+    xMin: centerX - rangeX,
+    xMax: centerX + rangeX,
+    yMin: centerY - rangeY,
+    yMax: centerY + rangeY
+  };
+}
+
+function handleWheel(e) {
+  e.preventDefault();
+
+  const rect = canvasRef.value.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  const worldX = toDataX(mouseX);
+  const worldY = toDataY(mouseY);
+
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel.value * zoomFactor));
+
+  if (newZoom !== zoomLevel.value) {
+    zoomLevel.value = newZoom;
+
+    // Calculate center point before zoom
+    const centerX = (defaultBounds.xMin + defaultBounds.xMax) / 2 + panOffset.value.x;
+    const centerY = (defaultBounds.yMin + defaultBounds.yMax) / 2 + panOffset.value.y;
+
+    // Adjust pan to zoom towards mouse position
+    panOffset.value.x += (worldX - centerX) * (1 - zoomFactor);
+    panOffset.value.y += (worldY - centerY) * (1 - zoomFactor);
+    
+    panOffset.value = clampPanOffset(panOffset.value);
+
+    updateBounds();
+    render();
+  }
+}
+
+function handleMouseDown(e) {
+  if (e.detail === 2) return; // Skip if it's a double-click (handled separately)
+
+  isDragging.value = true;
+  hasDragged.value = false;
+  lastMousePos.value = { x: e.offsetX, y: e.offsetY };
+  canvasRef.value.style.cursor = 'grabbing';
+}
+
+function handleMouseMove(e) {
+  if (!isDragging.value) return;
+
+  const deltaX = e.offsetX - lastMousePos.value.x;
+  const deltaY = e.offsetY - lastMousePos.value.y;
+
+  // Mark that we've dragged
+  if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+    hasDragged.value = true;
+  }
+
+  panOffset.value.x -= (deltaX / width) * (bounds.value.xMax - bounds.value.xMin);
+  panOffset.value.y += (deltaY / height) * (bounds.value.yMax - bounds.value.yMin);
+  
+  panOffset.value = clampPanOffset(panOffset.value);
+
+  lastMousePos.value = { x: e.offsetX, y: e.offsetY };
+  updateBounds();
+  render();
+}
+
+function handleMouseUp() {
+  isDragging.value = false;
+  canvasRef.value.style.cursor = 'crosshair';
+}
+
+function handleDoubleClick() {
+  zoomLevel.value = 1.0;
+  panOffset.value = { x: 0, y: 0 };
+  updateBounds();
+  render();
+}
+
+// Touch handlers
+function handleTouchStart(e) {
+  e.preventDefault();
+
+  if (e.touches.length === 1) {
+    // Single touch - pan
+    isDragging.value = true;
+    lastMousePos.value = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  } else if (e.touches.length === 2) {
+    // Pinch to zoom
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    initialTouchDistance.value = Math.sqrt(dx * dx + dy * dy);
+  }
+}
+
+function handleTouchMove(e) {
+  e.preventDefault();
+
+  if (e.touches.length === 1 && isDragging.value) {
+    // Pan
+    const rect = canvasRef.value.getBoundingClientRect();
+    const deltaX = e.touches[0].clientX - lastMousePos.value.x;
+    const deltaY = e.touches[0].clientY - lastMousePos.value.y;
+
+    panOffset.value.x -= (deltaX / width) * (bounds.value.xMax - bounds.value.xMin);
+    panOffset.value.y += (deltaY / height) * (bounds.value.yMax - bounds.value.yMin);
+    
+    panOffset.value = clampPanOffset(panOffset.value);
+
+    lastMousePos.value = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    updateBounds();
+    render();
+  } else if (e.touches.length === 2 && initialTouchDistance.value > 0) {
+    // Pinch to zoom
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const currentDistance = Math.sqrt(dx * dx + dy * dy);
+
+    const zoomFactor = currentDistance / initialTouchDistance.value;
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel.value * zoomFactor));
+
+    if (newZoom !== zoomLevel.value) {
+      zoomLevel.value = newZoom;
+      initialTouchDistance.value = currentDistance;
+      updateBounds();
+      render();
+    }
+  }
+}
+
+function handleTouchEnd() {
+  isDragging.value = false;
+  initialTouchDistance.value = 0;
+}
+
 function handleClick(e) {
+  // Don't add points if we dragged during this mouse down
+  if (hasDragged.value) {
+    hasDragged.value = false;
+    return;
+  }
+
   const x = toDataX(e.offsetX);
   const y = toDataY(e.offsetY);
   emit('add-point', { x, y });
 }
 
 // Lifecycle
+let resizeObserver = null;
+
 onMounted(() => {
   setupCanvas();
-  window.addEventListener('resize', setupCanvas);
+  
+  if (canvasRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      setupCanvas();
+    });
+    resizeObserver.observe(canvasRef.value);
+  }
 });
 
 onUnmounted(() => {
-  window.removeEventListener('resize', setupCanvas);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+  }
 });
 
 // Watch for changes
@@ -247,7 +471,19 @@ const pointCount = computed(() => props.points.length);
         <span>Rendering</span>
       </div>
     </div>
-    <canvas ref="canvasRef" @click="handleClick"></canvas>
+    <canvas
+      ref="canvasRef"
+      @click="handleClick"
+      @wheel="handleWheel"
+      @mousedown="handleMouseDown"
+      @mousemove="handleMouseMove"
+      @mouseup="handleMouseUp"
+      @mouseleave="handleMouseUp"
+      @dblclick="handleDoubleClick"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+    ></canvas>
     <div class="canvas-footer">
       <div class="point-count">Observations: <span>{{ pointCount }}</span></div>
       <div class="legend">
