@@ -241,7 +241,7 @@ const pointCount = computed(() => props.points.length);
 <template>
   <div class="canvas-wrapper">
     <div class="canvas-header">
-      <div class="canvas-title">posterior_visualization.canvas</div>
+      <div class="canvas-title">Posterior Visualization</div>
       <div class="status">
         <div class="status-dot"></div>
         <span>Rendering</span>
@@ -270,6 +270,7 @@ const pointCount = computed(() => props.points.length);
 
 <style scoped>
 .canvas-wrapper {
+  height: fit-content;
   background: #12121a;
   border-radius: 16px;
   border: 1px solid #1e1e2e;

@@ -207,6 +207,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .kernel-equation {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  color: #7c3aed;
+  color: #a78bfa;
 }
 </style>
