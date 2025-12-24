@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { computePosterior, linspace } from '@/utils/gp';
 
 const props = defineProps({
@@ -214,11 +214,8 @@ function setupCanvas() {
 }
 
 function handleClick(e) {
-  if (!canvasRef.value) return;
-  
-  const rect = canvasRef.value.getBoundingClientRect();
-  const x = toDataX(e.clientX - rect.left);
-  const y = toDataY(e.clientY - rect.top);
+  const x = toDataX(e.offsetX);
+  const y = toDataY(e.offsetY);
   emit('add-point', { x, y });
 }
 
@@ -226,6 +223,10 @@ function handleClick(e) {
 onMounted(() => {
   setupCanvas();
   window.addEventListener('resize', setupCanvas);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', setupCanvas);
 });
 
 // Watch for changes
