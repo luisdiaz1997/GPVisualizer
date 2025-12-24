@@ -33,30 +33,49 @@ function drawGrid() {
   
   ctx.strokeStyle = '#1e1e2e';
   ctx.lineWidth = 1;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.fillStyle = '#666';
+
+  const zeroX = toCanvasX(0);
+  const zeroY = toCanvasY(0);
 
   for (let x = Math.ceil(bounds.xMin); x <= bounds.xMax; x++) {
+    const cx = toCanvasX(x);
     ctx.beginPath();
-    ctx.moveTo(toCanvasX(x), 0);
-    ctx.lineTo(toCanvasX(x), height);
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, height);
     ctx.stroke();
+
+    // X-axis labels
+    if (x !== 0) {
+      ctx.fillText(x.toString(), cx, zeroY + 15);
+    }
   }
   for (let y = Math.ceil(bounds.yMin); y <= bounds.yMax; y++) {
+    const cy = toCanvasY(y);
     ctx.beginPath();
-    ctx.moveTo(0, toCanvasY(y));
-    ctx.lineTo(width, toCanvasY(y));
+    ctx.moveTo(0, cy);
+    ctx.lineTo(width, cy);
     ctx.stroke();
+
+    // Y-axis labels
+    if (y !== 0) {
+      ctx.fillText(y.toString(), zeroX - 15, cy);
+    }
   }
 
   // Axes
   ctx.strokeStyle = '#2a2a3a';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(0, toCanvasY(0));
-  ctx.lineTo(width, toCanvasY(0));
+  ctx.moveTo(0, zeroY);
+  ctx.lineTo(width, zeroY);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(toCanvasX(0), 0);
-  ctx.lineTo(toCanvasX(0), height);
+  ctx.moveTo(zeroX, 0);
+  ctx.lineTo(zeroX, height);
   ctx.stroke();
 }
 
