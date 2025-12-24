@@ -62,16 +62,21 @@ export function computePosterior(points, testX, params) {
     const K_Xs = kernelMatrix(testX, X, params.lengthScale, params.signalVariance, kernelName);
 
     // Mean: K_Xs * (K_XX)^-1 * y
-    const alpha = choleskySolve(L, y);
-    const mean = matVec(K_Xs, alpha);
-
-    // Variance: k(x*, x*) - K_Xs * (K_XX)^-1 * K_Xs^T
+    const alpha = solveL(L, y);
     const k_ss = params.signalVariance;
-    const variance = testX.map((_, i) => {
-        const v = solveL(L, K_Xs[i]);
-        const vTv = v.reduce((s, vi) => s + vi * vi, 0);
-        return Math.max(k_ss - vTv, 1e-10);
-    });
+    // For each test point i:
+    // v_i = L^{-1} K_Xs[i]^T  (one forward solve, reused)
+    // mean_i = v_i^T beta
+    // var_i = k_ss - ||v_i||^2
+    const { mean, variance } = K_Xs
+        .map(row => solveL(L, row))
+        .reduce((acc, v) => {
+            const mu = v.reduce((s, vi, j) => s + vi * alpha[j], 0);
+            const vTv = v.reduce((s, vi) => s + vi * vi, 0);
+            acc.mean.push(mu);
+            acc.variance.push(Math.max(k_ss - vTv, 1e-10));
+            return acc;
+        }, { mean: [], variance: [] });
 
     return { mean, variance };
 }
