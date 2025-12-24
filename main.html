@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Gaussian Process Visualization</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: #0a0a0f;
+            min-height: 100vh;
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 50%, #f472b6 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .canvas-wrapper {
+            background: #12121a;
+            border-radius: 16px;
+            border: 1px solid #1e1e2e;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .canvas-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #1e1e2e;
+            background: #0d0d12;
+        }
+
+        .canvas-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        canvas {
+            width: 100%;
+            height: 500px;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .canvas-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #1e1e2e;
+            background: #0d0d12;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .point-count {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .point-count span {
+            color: #00d4ff;
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .legend-line {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel {
+            background: #12121a;
+            border-radius: 16px;
+            border: 1px solid #1e1e2e;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #1e1e2e;
+            background: #0d0d12;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .panel-content {
+            padding: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 24px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .control-name {
+            font-size: 13px;
+            color: #888;
+        }
+
+        .control-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #1e1e2e;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+            cursor: pointer;
+            border: 3px solid #12121a;
+            transition: transform 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+            cursor: pointer;
+            border: 3px solid #12121a;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: #1e1e2e;
+            color: #888;
+            border: 1px solid #2a2a3a;
+        }
+
+        .btn-secondary:hover {
+            background: #2a2a3a;
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 212, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .info-panel p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .info-panel strong {
+            color: #888;
+        }
+
+        .kernel-info {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #7c3aed;
+            background: rgba(124, 58, 237, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">𝒢</div>
+            <div>
+                <h1>Gaussian Process Visualizer</h1>
+                <div class="subtitle">Interactive posterior inference with RBF kernel</div>
+            </div>
+        </header>
+
+        <div class="main-grid">
+            <div class="canvas-wrapper">
+                <div class="canvas-header">
+                    <div class="canvas-title">posterior_visualization.canvas</div>
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <span>Rendering</span>
+                    </div>
+                </div>
+                <canvas id="gpCanvas"></canvas>
+                <div class="canvas-footer">
+                    <div class="point-count">Observations: <span id="pointCount">0</span></div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-line" style="background: #00d4ff;"></div>
+                            <span>Mean</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-line" style="background: rgba(124, 58, 237, 0.4);"></div>
+                            <span>±2σ</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot" style="background: #f472b6;"></div>
+                            <span>Data</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">Kernel Parameters</div>
+                    </div>
+                    <div class="panel-content">
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span class="control-name">Length Scale (ℓ)</span>
+                                <span class="control-value" id="lengthValue">1.00</span>
+                            </div>
+                            <input type="range" id="lengthScale" min="0.1" max="3" step="0.05" value="1">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span class="control-name">Signal Variance (σ²)</span>
+                                <span class="control-value" id="signalValue">1.00</span>
+                            </div>
+                            <input type="range" id="signalVariance" min="0.1" max="3" step="0.05" value="1">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span class="control-name">Noise Level (σₙ)</span>
+                                <span class="control-value" id="noiseValue">0.10</span>
+                            </div>
+                            <input type="range" id="noiseLevel" min="0.01" max="0.5" step="0.01" value="0.1">
+                        </div>
+
+                        <div class="kernel-info">
+                            k(x, x') = σ² exp(-||x-x'||² / 2ℓ²)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">Actions</div>
+                    </div>
+                    <div class="panel-content">
+                        <div class="button-group">
+                            <button class="btn-primary" id="randomPoints">
+                                <span>✦</span> Add Random Points
+                            </button>
+                            <button class="btn-secondary" id="samplePrior">
+                                <span>〰</span> Sample GP
+                            </button>
+                            <button class="btn-danger" id="clearPoints">
+                                <span>✕</span> Clear All Points
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-panel">
+                    <p><strong>Click</strong> on the canvas to add observation points. The GP posterior updates in
+                        real-time showing the mean prediction and 95% confidence interval.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // Minimal Matrix Library (numpy-style helpers)
+        // ============================================
+        const M = {
+            // Create n x m matrix filled with value
+            full: (n, m, val) => Array(n).fill().map(() => Array(m).fill(val)),
+
+            // Create n x n identity matrix
+            eye: (n) => M.full(n, n, 0).map((row, i) => { row[i] = 1; return row; }),
+
+            // Create vector from start to end with n points
+            linspace: (start, end, n) => {
+                const step = (end - start) / (n - 1);
+                return Array(n).fill().map((_, i) => start + i * step);
+            },
+
+            // Transpose matrix
+            T: (A) => A[0].map((_, j) => A.map(row => row[j])),
+
+            // Matrix-matrix multiply: C = A @ B
+            mm: (A, B) => {
+                const [m, n, p] = [A.length, A[0].length, B[0].length];
+                const C = M.full(m, p, 0);
+                for (let i = 0; i < m; i++) {
+                    for (let j = 0; j < p; j++) {
+                        let sum = 0;
+                        for (let k = 0; k < n; k++) sum += A[i][k] * B[k][j];
+                        C[i][j] = sum;
+                    }
+                }
+                return C;
+            },
+
+            // Matrix-vector multiply: y = A @ x
+            mv: (A, x) => A.map(row => row.reduce((s, a, i) => s + a * x[i], 0)),
+
+            // Element-wise operations
+            add: (A, B) => A.map((row, i) => row.map((v, j) => v + B[i][j])),
+            scale: (A, c) => A.map(row => row.map(v => v * c)),
+
+            // Add scalar to diagonal
+            addDiag: (A, c) => A.map((row, i) => row.map((v, j) => i === j ? v + c : v)),
+
+            // Cholesky decomposition: A = L @ L^T, returns L
+            chol: (A) => {
+                const n = A.length;
+                const L = M.full(n, n, 0);
+                for (let i = 0; i < n; i++) {
+                    for (let j = 0; j <= i; j++) {
+                        let sum = 0;
+                        for (let k = 0; k < j; k++) sum += L[i][k] * L[j][k];
+                        L[i][j] = (i === j)
+                            ? Math.sqrt(Math.max(A[i][i] - sum, 1e-10))
+                            : (A[i][j] - sum) / L[j][j];
+                    }
+                }
+                return L;
+            },
+
+            // Solve L @ x = b (forward substitution) for lower triangular L
+            solveL: (L, b) => {
+                const n = L.length;
+                const x = Array(n).fill(0);
+                for (let i = 0; i < n; i++) {
+                    let sum = b[i];
+                    for (let j = 0; j < i; j++) sum -= L[i][j] * x[j];
+                    x[i] = sum / L[i][i];
+                }
+                return x;
+            },
+
+            // Solve L^T @ x = b (backward substitution)
+            solveLT: (L, b) => {
+                const n = L.length;
+                const x = Array(n).fill(0);
+                for (let i = n - 1; i >= 0; i--) {
+                    let sum = b[i];
+                    for (let j = i + 1; j < n; j++) sum -= L[j][i] * x[j];
+                    x[i] = sum / L[i][i];
+                }
+                return x;
+            },
+
+            // Solve A @ x = b using Cholesky (A must be positive definite)
+            cholSolve: (L, b) => M.solveLT(L, M.solveL(L, b)),
+
+            // Solve A @ X = B for multiple right-hand sides (B is n x m matrix)
+            cholSolveMatrix: (L, B) => M.T(M.T(B).map(col => M.cholSolve(L, col))),
+        };
+
+        // ============================================
+        // GP Visualizer
+        // ============================================
+        class GPVisualizer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+
+                this.points = [];
+                this.priorSamples = [];
+
+                // GP hyperparameters
+                this.lengthScale = 1.0;
+                this.signalVariance = 1.0;
+                this.noiseLevel = 0.1;
+
+                // Coordinate system
+                this.xMin = -3;
+                this.xMax = 3;
+                this.yMin = -2;
+                this.yMax = 2;
+
+                // Number of test points for plotting
+                this.numTest = 300;
+
+                // Precompute test points
+                this.testX = M.linspace(this.xMin, this.xMax, this.numTest);
+
+                this.setupCanvas();
+                this.setupEventListeners();
+                this.render();
+            }
+
+            setupCanvas() {
+                const resizeCanvas = () => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const dpr = window.devicePixelRatio || 1;
+                    this.canvas.width = rect.width * dpr;
+                    this.canvas.height = rect.height * dpr;
+                    this.ctx.scale(dpr, dpr);
+                    this.width = rect.width;
+                    this.height = rect.height;
+                };
+
+                resizeCanvas();
+                window.addEventListener('resize', () => {
+                    resizeCanvas();
+                    this.render();
+                });
+            }
+
+            // Coordinate transforms
+            toCanvasX(x) {
+                return ((x - this.xMin) / (this.xMax - this.xMin)) * this.width;
+            }
+
+            toCanvasY(y) {
+                return this.height - ((y - this.yMin) / (this.yMax - this.yMin)) * this.height;
+            }
+
+            toDataX(canvasX) {
+                return this.xMin + (canvasX / this.width) * (this.xMax - this.xMin);
+            }
+
+            toDataY(canvasY) {
+                return this.yMax - (canvasY / this.height) * (this.yMax - this.yMin);
+            }
+
+            // Build RBF kernel matrix: K[i,j] = σ² * exp(-||x1[i] - x2[j]||² / (2ℓ²))
+            rbfKernelMatrix(x1, x2) {
+                const l2 = this.lengthScale * this.lengthScale;
+                const sigma2 = this.signalVariance;
+
+                return x1.map(xi =>
+                    x2.map(xj => {
+                        const d = xi - xj;
+                        return sigma2 * Math.exp(-0.5 * d * d / l2);
+                    })
+                );
+            }
+
+            // Compute GP posterior
+            computePosterior() {
+                const n = this.points.length;
+                const testX = this.testX;
+                const m = testX.length;
+
+                if (n === 0) {
+                    return {
+                        testX,
+                        mean: Array(m).fill(0),
+                        variance: Array(m).fill(this.signalVariance)
+                    };
+                }
+
+                const X = this.points.map(p => p.x);
+                const y = this.points.map(p => p.y);
+
+                // K_XX: kernel at training points + noise + jitter
+                let K_XX = this.rbfKernelMatrix(X, X);
+                K_XX = M.addDiag(K_XX, this.noiseLevel ** 2 + 1e-8);
+
+                // K_Xs: cross-covariance (m x n)
+                const K_Xs = this.rbfKernelMatrix(testX, X);
+
+                // Cholesky decomposition: K_XX = L @ L^T
+                const L = M.chol(K_XX);
+
+                // alpha = K_XX^{-1} @ y
+                const alpha = M.cholSolve(L, y);
+
+                // Posterior mean: μ* = K_Xs @ alpha
+                const mean = M.mv(K_Xs, alpha);
+
+                // Posterior variance: σ²* = k(x*,x*) - k*^T K^{-1} k*
+                // Using Cholesky K = L L^T:  σ²* = k** - ||L^{-1} k*||²
+                // Only need forward solve (solveL), not full cholSolve!
+                const k_ss = this.signalVariance;
+
+                const variance = testX.map((_, i) => {
+                    // k_star is the i-th row of K_Xs (kernel between test point i and all training points)
+                    const k_star = K_Xs[i];
+                    // Solve L @ v = k_star
+                    const v = M.solveL(L, k_star);
+                    // var = k** - v^T v
+                    const vTv = v.reduce((sum, vi) => sum + vi * vi, 0);
+                    return Math.max(k_ss - vTv, 1e-10);
+                });
+
+                return { testX, mean, variance };
+            }
+
+            // Sample from GP (prior if no points, posterior otherwise)
+            sampleFromGP() {
+                const numPoints = 150;
+                const testX = M.linspace(this.xMin, this.xMax, numPoints);
+                const m = testX.length;
+                const n = this.points.length;
+
+                if (n === 0) {
+                    // Sample from prior: f ~ N(0, K)
+                    let K = this.rbfKernelMatrix(testX, testX);
+                    K = M.addDiag(K, 1e-8);
+
+                    const L = M.chol(K);
+                    const z = Array(m).fill().map(() => this.randn());
+                    const sample = M.mv(L, z);
+
+                    this.priorSamples.push({ x: testX, y: sample });
+                } else {
+                    // Sample from posterior: f* | y ~ N(μ*, Σ*)
+                    const X = this.points.map(p => p.x);
+                    const y = this.points.map(p => p.y);
+
+                    // Training kernel + noise
+                    let K_XX = this.rbfKernelMatrix(X, X);
+                    K_XX = M.addDiag(K_XX, this.noiseLevel ** 2 + 1e-8);
+                    const L_XX = M.chol(K_XX);
+
+                    // Cross-covariance K_Xs (m x n)
+                    const K_Xs = this.rbfKernelMatrix(testX, X);
+
+                    // Test covariance K_ss (m x m)
+                    let K_ss = this.rbfKernelMatrix(testX, testX);
+
+                    // Posterior mean: μ* = K_Xs @ K^{-1} @ y = K_Xs @ alpha
+                    const alpha = M.cholSolve(L_XX, y);
+                    const mu = M.mv(K_Xs, alpha);
+
+                    // Posterior covariance: Σ* = K_ss - K_Xs @ K^{-1} @ K_Xs^T
+                    // Let V = L^{-1} @ K_Xs^T (n x m), so K_Xs @ K^{-1} @ K_Xs^T = V^T @ V
+                    // V[:,j] = L^{-1} @ K_Xs[j,:] for each test point j
+
+                    // Build V: for each test point, solve L @ v = k_star
+                    // K_Xs[i] is the kernel vector for test point i (length n)
+                    const V = [];  // will be n x m
+                    for (let j = 0; j < n; j++) {
+                        V[j] = [];
+                    }
+
+                    for (let i = 0; i < m; i++) {
+                        const k_star = K_Xs[i];  // length n
+                        const v = M.solveL(L_XX, k_star);  // length n
+                        for (let j = 0; j < n; j++) {
+                            V[j][i] = v[j];
+                        }
+                    }
+
+                    // Σ* = K_ss - V^T @ V
+                    const VtV = M.mm(M.T(V), V);  // m x m
+                    const Sigma = K_ss.map((row, i) => row.map((v, j) => v - VtV[i][j]));
+
+                    // Add jitter for numerical stability
+                    const Sigma_jit = M.addDiag(Sigma, 1e-6);
+
+                    // Sample: f* = μ* + L_Σ @ z
+                    const L_Sigma = M.chol(Sigma_jit);
+                    const z = Array(m).fill().map(() => this.randn());
+                    const Lz = M.mv(L_Sigma, z);
+                    const posteriorSample = mu.map((mui, i) => mui + Lz[i]);
+
+                    this.priorSamples.push({ x: testX, y: posteriorSample });
+                }
+
+                if (this.priorSamples.length > 5) this.priorSamples.shift();
+                this.render();
+            }
+
+            randn() {
+                let u = 0, v = 0;
+                while (u === 0) u = Math.random();
+                while (v === 0) v = Math.random();
+                return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            }
+
+            drawGrid() {
+                this.ctx.strokeStyle = '#1e1e2e';
+                this.ctx.lineWidth = 1;
+
+                for (let x = Math.ceil(this.xMin); x <= this.xMax; x++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.toCanvasX(x), 0);
+                    this.ctx.lineTo(this.toCanvasX(x), this.height);
+                    this.ctx.stroke();
+                }
+
+                for (let y = Math.ceil(this.yMin); y <= this.yMax; y++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, this.toCanvasY(y));
+                    this.ctx.lineTo(this.width, this.toCanvasY(y));
+                    this.ctx.stroke();
+                }
+
+                // Axes
+                this.ctx.strokeStyle = '#2a2a3a';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, this.toCanvasY(0));
+                this.ctx.lineTo(this.width, this.toCanvasY(0));
+                this.ctx.stroke();
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.toCanvasX(0), 0);
+                this.ctx.lineTo(this.toCanvasX(0), this.height);
+                this.ctx.stroke();
+            }
+
+            drawConfidenceBand(testX, mean, variance) {
+                this.ctx.beginPath();
+
+                for (let i = 0; i < testX.length; i++) {
+                    const x = this.toCanvasX(testX[i]);
+                    const y = this.toCanvasY(mean[i] + 2 * Math.sqrt(variance[i]));
+                    i === 0 ? this.ctx.moveTo(x, y) : this.ctx.lineTo(x, y);
+                }
+
+                for (let i = testX.length - 1; i >= 0; i--) {
+                    const x = this.toCanvasX(testX[i]);
+                    const y = this.toCanvasY(mean[i] - 2 * Math.sqrt(variance[i]));
+                    this.ctx.lineTo(x, y);
+                }
+
+                this.ctx.closePath();
+
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, 'rgba(124, 58, 237, 0.3)');
+                gradient.addColorStop(0.5, 'rgba(124, 58, 237, 0.15)');
+                gradient.addColorStop(1, 'rgba(124, 58, 237, 0.3)');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fill();
+            }
+
+            drawMeanLine(testX, mean) {
+                // Glow
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = 'rgba(0, 212, 255, 0.3)';
+                this.ctx.lineWidth = 8;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+
+                for (let i = 0; i < testX.length; i++) {
+                    const x = this.toCanvasX(testX[i]);
+                    const y = this.toCanvasY(mean[i]);
+                    i === 0 ? this.ctx.moveTo(x, y) : this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+
+                // Main line
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = '#00d4ff';
+                this.ctx.lineWidth = 3;
+
+                for (let i = 0; i < testX.length; i++) {
+                    const x = this.toCanvasX(testX[i]);
+                    const y = this.toCanvasY(mean[i]);
+                    i === 0 ? this.ctx.moveTo(x, y) : this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+            }
+
+            drawPriorSamples() {
+                const colors = [
+                    'rgba(255, 150, 150, 0.5)',
+                    'rgba(150, 255, 150, 0.5)',
+                    'rgba(150, 150, 255, 0.5)',
+                    'rgba(255, 255, 150, 0.5)',
+                    'rgba(255, 150, 255, 0.5)'
+                ];
+
+                this.priorSamples.forEach((sample, s) => {
+                    this.ctx.beginPath();
+                    this.ctx.strokeStyle = colors[s % colors.length];
+                    this.ctx.lineWidth = 2;
+
+                    sample.x.forEach((xi, i) => {
+                        const x = this.toCanvasX(xi);
+                        const y = this.toCanvasY(sample.y[i]);
+                        i === 0 ? this.ctx.moveTo(x, y) : this.ctx.lineTo(x, y);
+                    });
+                    this.ctx.stroke();
+                });
+            }
+
+            drawPoints() {
+                this.points.forEach(point => {
+                    const x = this.toCanvasX(point.x);
+                    const y = this.toCanvasY(point.y);
+
+                    // Glow
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 12, 0, Math.PI * 2);
+                    this.ctx.fillStyle = 'rgba(244, 114, 182, 0.3)';
+                    this.ctx.fill();
+
+                    // Point
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 6, 0, Math.PI * 2);
+                    this.ctx.fillStyle = '#f472b6';
+                    this.ctx.fill();
+
+                    // Highlight
+                    this.ctx.beginPath();
+                    this.ctx.arc(x - 1.5, y - 1.5, 2, 0, Math.PI * 2);
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    this.ctx.fill();
+                });
+            }
+
+            render() {
+                this.ctx.fillStyle = '#0d0d12';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                this.drawGrid();
+                this.drawPriorSamples();
+
+                const posterior = this.computePosterior();
+                this.drawConfidenceBand(posterior.testX, posterior.mean, posterior.variance);
+                this.drawMeanLine(posterior.testX, posterior.mean);
+                this.drawPoints();
+
+                document.getElementById('pointCount').textContent = this.points.length;
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = this.toDataX(e.clientX - rect.left);
+                    const y = this.toDataY(e.clientY - rect.top);
+
+                    this.points.push({ x, y });
+                    this.priorSamples = [];
+                    this.render();
+                });
+
+                document.getElementById('lengthScale').addEventListener('input', (e) => {
+                    this.lengthScale = parseFloat(e.target.value);
+                    document.getElementById('lengthValue').textContent = this.lengthScale.toFixed(2);
+                    this.priorSamples = [];
+                    this.render();
+                });
+
+                document.getElementById('signalVariance').addEventListener('input', (e) => {
+                    this.signalVariance = parseFloat(e.target.value);
+                    document.getElementById('signalValue').textContent = this.signalVariance.toFixed(2);
+                    this.priorSamples = [];
+                    this.render();
+                });
+
+                document.getElementById('noiseLevel').addEventListener('input', (e) => {
+                    this.noiseLevel = parseFloat(e.target.value);
+                    document.getElementById('noiseValue').textContent = this.noiseLevel.toFixed(2);
+                    this.render();
+                });
+
+                document.getElementById('clearPoints').addEventListener('click', () => {
+                    this.points = [];
+                    this.priorSamples = [];
+                    this.render();
+                });
+
+                document.getElementById('randomPoints').addEventListener('click', () => {
+                    for (let i = 0; i < 5; i++) {
+                        const x = this.xMin + Math.random() * (this.xMax - this.xMin);
+                        const y = Math.sin(x) * 0.5 + Math.cos(x * 0.5) * 0.3 + (Math.random() - 0.5) * 0.3;
+                        this.points.push({ x, y });
+                    }
+                    this.priorSamples = [];
+                    this.render();
+                });
+
+                document.getElementById('samplePrior').addEventListener('click', () => {
+                    this.sampleFromGP();
+                });
+            }
+        }
+
+        const visualizer = new GPVisualizer('gpCanvas');
+    </script>
+</body>
+
+</html>
