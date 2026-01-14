@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, watch, onMounted, onUnmounted, computed } from 'vue';
-import { computePosterior, sampleFromGP, linspace } from '../../../GPzoo.js/src/gp';
+import { computePosterior, sampleFromGP, linspace } from 'gpzoo';
 import { useViewport } from '@/composables/useViewport';
 import { 
   drawGrid, 
