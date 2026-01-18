@@ -1,21 +1,23 @@
 <script setup>
-import { ref, reactive, watch, onMounted, onUnmounted, computed } from 'vue';
-import { computePosterior, sampleFromGP, linspace } from 'gpzoo';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useViewport } from '@/composables/useViewport';
-import { 
-  drawGrid, 
-  drawMeanLine, 
-  drawConfidenceBand, 
-  drawSamples, 
-  drawPoints 
+import {
+  drawGrid,
+  drawMeanLine,
+  drawConfidenceBand,
+  drawSamples,
+  drawPoints
 } from '@/utils/canvasDrawing';
 
 const props = defineProps({
-  points: Array,
-  params: Object,
+  points: Array,      // [{ x, y }, ...] observation points
+  testX: Array,       // number[] x-coordinates for plotting
+  mean: Array,        // number[] posterior mean
+  variance: Array,    // number[] posterior variance
+  samples: Array,     // [{ x: [], y: [] }, ...] samples with x and y values
 });
 
-const emit = defineEmits(['add-point']);
+const emit = defineEmits(['add-point', 'bounds-change']);
 
 // Canvas ref and context
 const canvasRef = ref(null);
@@ -25,44 +27,29 @@ let height = 0;
 
 // Initialize Viewport logic
 const viewport = useViewport();
-const { 
-  bounds, zoomLevel, isDragging, hasDragged, 
+const {
+  bounds, zoomLevel, isDragging, hasDragged,
   toCanvasX, toCanvasY, toDataX, toDataY,
   handleWheel, handleMouseDown, handleMouseMove, handleMouseUp,
   handleDoubleClick, handleTouchStart, handleTouchMove, handleTouchEnd
 } = viewport;
 
-// Samples state
-const samples = reactive([]);
-
-// Test points specific to current view
-const numTest = 300;
-const testX = computed(() => linspace(bounds.value.xMin, bounds.value.xMax, numTest));
-
-// Sample GP using current dynamic bounds
-function sampleGP() {
-  const sampleX = testX.value; 
-  const sampleY = sampleFromGP(props.points, sampleX, props.params);
-  samples.push({ x: sampleX, y: sampleY });
-  if (samples.length > 5) samples.shift();
-  render();
-}
+// Emit bounds changes to parent
+watch(bounds, (newBounds) => {
+  emit('bounds-change', { ...newBounds });
+}, { deep: true, immediate: true });
 
 // Render Loop
 function render() {
   if (!ctx) return;
 
-  // Clear background
   ctx.fillStyle = '#0d0d12';
   ctx.fillRect(0, 0, width, height);
 
-  // Draw scene using pure utility functions
   drawGrid(ctx, width, height, bounds.value, toCanvasX, toCanvasY);
-  drawSamples(ctx, samples, toCanvasX, toCanvasY, width, height);
-
-  const { mean, variance } = computePosterior(props.points, testX.value, props.params);
-  drawConfidenceBand(ctx, testX.value, mean, variance, toCanvasX, toCanvasY, height, width);
-  drawMeanLine(ctx, testX.value, mean, toCanvasX, toCanvasY, width, height);
+  drawSamples(ctx, props.samples || [], toCanvasX, toCanvasY, width, height);
+  drawConfidenceBand(ctx, props.testX, props.mean, props.variance, toCanvasX, toCanvasY, height, width);
+  drawMeanLine(ctx, props.testX, props.mean, toCanvasX, toCanvasY, width, height);
   drawPoints(ctx, props.points, toCanvasX, toCanvasY, width, height);
 }
 
@@ -143,17 +130,9 @@ onUnmounted(() => {
 });
 
 // Watch for changes
-watch(() => props.points, () => {
-  samples.length = 0;
+watch([() => props.points, () => props.mean, () => props.variance, () => props.samples], () => {
   render();
 }, { deep: true });
-
-watch(() => props.params, () => {
-  samples.length = 0;
-  render();
-}, { deep: true });
-
-defineExpose({ sampleGP });
 
 const pointCount = computed(() => props.points.length);
 </script>
